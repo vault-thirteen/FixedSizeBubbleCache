@@ -5,6 +5,7 @@ package fsbcache
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
 // A fixed-Size Bubble Cache.
@@ -41,7 +42,7 @@ type FixedSizeBubbleCache struct {
 
 	// An internal List of Records that may be fast requested by their unique
 	// Identifier, a UID.
-	recordsByUID map[FixedSizeBubbleCacheRecordUID]*FixedSizeBubbleCacheRecord
+	recordsByUID sync.Map
 
 	// Record's Time-To-Live (TTL) is the Period of Time, after which the
 	// Record is considered outdated. If a Record requested from the Cache is
@@ -72,7 +73,6 @@ func (c *FixedSizeBubbleCache) initialize(
 	c.bottom = nil
 	c.size = 0
 	c.capacity = capacity
-	c.recordsByUID = make(map[FixedSizeBubbleCacheRecordUID]*FixedSizeBubbleCacheRecord)
 	c.recordTTL = recordTTL
 }
 
@@ -108,10 +108,16 @@ func (c *FixedSizeBubbleCache) AddRecord(
 func (c *FixedSizeBubbleCache) addRecord(
 	addedRecord *FixedSizeBubbleCacheRecord,
 ) {
-	var existingRecord *FixedSizeBubbleCacheRecord
+	var existingRecordIfc interface{}
 	var uidExists bool
-	existingRecord, uidExists = c.recordsByUID[addedRecord.UID]
+	existingRecordIfc, uidExists = c.recordsByUID.Load(addedRecord.UID)
 	if uidExists {
+		var existingRecord *FixedSizeBubbleCacheRecord
+		var ok bool
+		existingRecord, ok = existingRecordIfc.(*FixedSizeBubbleCacheRecord)
+		if !ok {
+			panic(ErrTypeCast)
+		}
 		if existingRecord != c.top {
 			c.moveExistingRecordToTop(existingRecord)
 		}
@@ -120,10 +126,11 @@ func (c *FixedSizeBubbleCache) addRecord(
 	}
 	if c.size == c.capacity {
 		var removedRecord *FixedSizeBubbleCacheRecord = c.unlinkBottomRecord()
-		delete(c.recordsByUID, removedRecord.UID)
+		c.recordsByUID.Delete(removedRecord.UID)
 	}
 	c.linkTopRecord(addedRecord)
-	c.recordsByUID[addedRecord.UID] = addedRecord
+
+	c.recordsByUID.Store(addedRecord.UID, addedRecord)
 	c.top.UpdateDataAndLAT(addedRecord.Data)
 	if c.size != c.capacity {
 		c.size++ // We can not increase the Size prior to Linking.
@@ -258,14 +265,20 @@ func (c *FixedSizeBubbleCache) Clear() (err error) {
 // This is a Self-Check Function intended to find Anomalies.
 // This Function is not intended to be used in an ordinary Case.
 // Returns 'true' if the Cache is in a good Shape.
-func (c FixedSizeBubbleCache) isIntegral() bool {
+func (c *FixedSizeBubbleCache) isIntegral() bool {
 
 	// Check Fast Access Register.
-	var record *FixedSizeBubbleCacheRecord
-	for _, record = range c.recordsByUID {
-		if record == nil {
+	var ok bool = true
+	var nilSearcher = func(key, value interface{}) bool {
+		if value == nil {
+			ok = false
 			return false
 		}
+		return true
+	}
+	c.recordsByUID.Range(nilSearcher)
+	if !ok {
+		return false
 	}
 
 	// Prepare Data.
@@ -416,7 +429,7 @@ func (c *FixedSizeBubbleCache) deleteRecord(
 		c.top = nil
 		c.bottom = nil
 		c.size--
-		delete(c.recordsByUID, record.UID)
+		c.recordsByUID.Delete(record.UID)
 		return
 	}
 
@@ -429,22 +442,22 @@ func (c *FixedSizeBubbleCache) deleteRecord(
 		c.unlinkMiddleRecord(record)
 	}
 	c.size--
-	delete(c.recordsByUID, record.UID)
+	c.recordsByUID.Delete(record.UID)
 	return
 }
 
 // Checks whether the specified Record's UID exists in the Cache's List.
-func (c FixedSizeBubbleCache) RecordUIDExists(
+func (c *FixedSizeBubbleCache) RecordUIDExists(
 	uid FixedSizeBubbleCacheRecordUID,
 ) (uidExists bool) {
 	return c.recordUIDExists(uid)
 }
 
 // Checks whether the specified Record's UID exists in the Cache's List.
-func (c FixedSizeBubbleCache) recordUIDExists(
+func (c *FixedSizeBubbleCache) recordUIDExists(
 	uid FixedSizeBubbleCacheRecordUID,
 ) (uidExists bool) {
-	_, uidExists = c.recordsByUID[uid]
+	_, uidExists = c.recordsByUID.Load(uid)
 	return
 }
 
@@ -453,10 +466,16 @@ func (c *FixedSizeBubbleCache) getRecordByUID(
 	uid FixedSizeBubbleCacheRecordUID,
 ) (record *FixedSizeBubbleCacheRecord, err error) {
 	var recordIsFound bool
-	record, recordIsFound = c.recordsByUID[uid]
+	var recordIfc interface{}
+	recordIfc, recordIsFound = c.recordsByUID.Load(uid)
 	if !recordIsFound {
 		err = fmt.Errorf(ErrfRecordWithUidIsNotFound, uid)
 		return
+	}
+	var ok bool
+	record, ok = recordIfc.(*FixedSizeBubbleCacheRecord)
+	if !ok {
+		panic(ErrTypeCast)
 	}
 	return
 }
@@ -478,7 +497,7 @@ func (c *FixedSizeBubbleCache) DeleteRecordByUID(
 }
 
 // Lists the Values of all Records of the Cache.
-func (c FixedSizeBubbleCache) ListAllRecordValues() (values []interface{}) {
+func (c *FixedSizeBubbleCache) ListAllRecordValues() (values []interface{}) {
 	values = make([]interface{}, c.size)
 	if c.size == 0 {
 		return
@@ -498,7 +517,7 @@ func (c FixedSizeBubbleCache) ListAllRecordValues() (values []interface{}) {
 }
 
 // Lists all the Records of the Cache.
-func (c FixedSizeBubbleCache) ListAllRecords() (records []*FixedSizeBubbleCacheRecord) {
+func (c *FixedSizeBubbleCache) ListAllRecords() (records []*FixedSizeBubbleCacheRecord) {
 	records = make([]*FixedSizeBubbleCacheRecord, c.size)
 	if c.size == 0 {
 		return records
@@ -552,13 +571,13 @@ func (c *FixedSizeBubbleCache) GetActualRecordDataByUID(
 }
 
 // Returns the 'RecordTTL' Parameter of the Cache.
-func (c FixedSizeBubbleCache) GetRecordTTL() uint {
+func (c *FixedSizeBubbleCache) GetRecordTTL() uint {
 	return c.recordTTL
 }
 
 // Checks whether the specified Record's UID exists in the Cache and
 // the Record with such UID is still active (not outdated).
-func (c FixedSizeBubbleCache) IsRecordUIDActive(
+func (c *FixedSizeBubbleCache) IsRecordUIDActive(
 	uid FixedSizeBubbleCacheRecordUID,
 ) (recordIsActive bool, err error) {
 

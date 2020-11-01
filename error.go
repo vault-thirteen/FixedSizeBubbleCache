@@ -12,4 +12,6 @@ const (
 	ErrfRecordWithUidIsNotFound = `Record with UID='%v' is not found`
 	ErrfRecordWithUidIsOutdated = `Record with UID='%v' is outdated`
 	ErrIntegrityCheckFailure    = `Integrity Check Failure`
+	//
+	ErrTypeCast = "Type Cast Failure"
 )

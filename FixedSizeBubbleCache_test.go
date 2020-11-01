@@ -33,8 +33,13 @@ func Test_initialize(t *testing.T) {
 	aTest.MustBeEqual(cache.bottom, (*FixedSizeBubbleCacheRecord)(nil))
 	aTest.MustBeEqual(cache.size, uint(0))
 	aTest.MustBeEqual(cache.capacity, uint(10))
-	aTest.MustBeDifferent((cache.recordsByUID), nil)
-	aTest.MustBeEqual(len(cache.recordsByUID), int(0))
+	var mapLen int
+	var lenCounter = func(key, value interface{}) bool {
+		mapLen++
+		return true
+	}
+	cache.recordsByUID.Range(lenCounter)
+	aTest.MustBeEqual(mapLen, int(0))
 	aTest.MustBeEqual(cache.recordTTL, uint(60))
 }
 
@@ -430,8 +435,11 @@ func Test_Clear(t *testing.T) {
 
 func Test_isIntegral(t *testing.T) {
 	var aTest *tester.Test = tester.New(t)
+	var testNumber int = 1
 
 	// Test #1. Bad Map.
+	fmt.Println(testNumber)
+	testNumber++
 	var cache = NewFixedSizeBubbleCache(3, 1)
 	cache.addRecord(
 		&FixedSizeBubbleCacheRecord{
@@ -439,10 +447,12 @@ func Test_isIntegral(t *testing.T) {
 			Data: 1,
 		},
 	)
-	cache.recordsByUID["1"] = nil
+	cache.recordsByUID.Store("1", nil)
 	aTest.MustBeEqual(cache.isIntegral(), false)
 
 	// Test #2. Size > Capacity.
+	fmt.Println(testNumber)
+	testNumber++
 	cache = NewFixedSizeBubbleCache(3, 1)
 	cache.addRecord(
 		&FixedSizeBubbleCacheRecord{
@@ -453,7 +463,9 @@ func Test_isIntegral(t *testing.T) {
 	cache.size = 999
 	aTest.MustBeEqual(cache.isIntegral(), false)
 
-	// Test #2. Top and Bottom are non-null when Size is 0.
+	// Test #3. Top and Bottom are non-null when Size is 0.
+	fmt.Println(testNumber)
+	testNumber++
 	cache = NewFixedSizeBubbleCache(3, 1)
 	cache.addRecord(
 		&FixedSizeBubbleCacheRecord{
@@ -468,7 +480,9 @@ func Test_isIntegral(t *testing.T) {
 	cache.bottom = nil
 	aTest.MustBeEqual(cache.isIntegral(), true)
 
-	// Test #3. Size is 1.
+	// Test #4. Size is 1.
+	fmt.Println(testNumber)
+	testNumber++
 	cache = NewFixedSizeBubbleCache(3, 1)
 	cache.addRecord(
 		&FixedSizeBubbleCacheRecord{
@@ -537,7 +551,9 @@ func Test_isIntegral(t *testing.T) {
 	)
 	aTest.MustBeEqual(cache.isIntegral(), true)
 
-	// Test #6. Edges.
+	// Test #5. Edges.
+	fmt.Println(testNumber)
+	testNumber++
 	cache = NewFixedSizeBubbleCache(3, 1)
 	cache.addRecord(
 		&FixedSizeBubbleCacheRecord{
@@ -603,6 +619,8 @@ func Test_isIntegral(t *testing.T) {
 	aTest.MustBeEqual(cache.isIntegral(), false)
 
 	// Test #6. Reverse Loop.
+	fmt.Println(testNumber)
+	testNumber++
 	cache = NewFixedSizeBubbleCache(3, 1)
 	cache.addRecord(
 		&FixedSizeBubbleCacheRecord{
@@ -635,6 +653,8 @@ func Test_isIntegral(t *testing.T) {
 	aTest.MustBeEqual(cache.isIntegral(), false)
 
 	// Test #7. OK.
+	fmt.Println(testNumber)
+	testNumber++
 	cache = NewFixedSizeBubbleCache(3, 1)
 	cache.addRecord(
 		&FixedSizeBubbleCacheRecord{

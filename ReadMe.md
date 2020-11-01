@@ -4,6 +4,7 @@
 ## Short Description.
 
 This Package provides a fixed Size Bubble Cache Functionality.
+Versions prior to 1.1.0 do not support simultaneous Access.
 
 ## Full Description.
 
