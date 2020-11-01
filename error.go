@@ -10,6 +10,6 @@ const (
 	ErrCacheZeroSize  = "Cache Size is Zero"
 	//
 	ErrfRecordWithUidIsNotFound = `Record with UID='%v' is not found`
-	ErrfRecordWithUidIsOutdated = `Record with UID='%v' is not outdated`
+	ErrfRecordWithUidIsOutdated = `Record with UID='%v' is outdated`
 	ErrIntegrityCheckFailure    = `Integrity Check Failure`
 )
